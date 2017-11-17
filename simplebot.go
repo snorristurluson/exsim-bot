@@ -42,7 +42,9 @@ func (bot* SimpleBot) Connect(address string) {
 }
 
 func (bot* SimpleBot) SetTargetLocation(loc Vector3) {
-	msg := fmt.Sprintf(`{"settargetlocation": {"x": %v, "y": %v, "z": %v}}` + "\n", loc.X, loc.Y, loc.Z)
+	msg := fmt.Sprintf(
+		`{"command": "settargetlocation", "params": {"location": {"x": %v, "y": %v, "z": %v}}}` + "\n",
+		loc.X, loc.Y, loc.Z)
 	bot.connection.Write([]byte(msg))
 
 }
@@ -53,6 +55,8 @@ func (bot* SimpleBot) ReceiveLoop() {
 		_, err := bot.connection.Read(recvBuf)
 		if err != nil {
 			fmt.Printf("Error in Read: %v\n", err)
+			bot.connection.Close()
+			bot.connection = nil
 			break
 		}
 	}
@@ -60,13 +64,13 @@ func (bot* SimpleBot) ReceiveLoop() {
 
 func (bot* SimpleBot) BehaviorLoop() {
 	for bot.connection != nil {
-		bot.SetTargetLocation(Vector3{X: rand.Float64() * 800, Y: rand.Float64() * 600, Z: 0.0})
-		time.Sleep(10 * time.Second)
+		bot.SetTargetLocation(Vector3{X: rand.Float64() * 5000 - 2500, Y: rand.Float64() * 5000 - 2500, Z: 0.0})
+		time.Sleep(time.Duration((rand.Float64() * 25 + 5)) * time.Second)
 	}
 }
 
 func main() {
-	for i:= 0; i < 100; i++ {
+	for i:= 0; i < 5; i++ {
 		bot := NewSimpleBot(int64(i))
 		bot.Connect("localhost:4040")
 		if bot.connection == nil {
@@ -75,7 +79,7 @@ func main() {
 		go bot.ReceiveLoop()
 		go bot.BehaviorLoop()
 
-		time.Sleep(1 * time.Second)
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	exitSignal := make(chan os.Signal)
