@@ -3,11 +3,9 @@ package main
 import (
 	"net"
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
 	"math/rand"
 	"time"
+	"sync"
 )
 
 type Vector3 struct {
@@ -34,7 +32,6 @@ func (bot* SimpleBot) Connect(address string) {
 		fmt.Printf("Couldn't connect to %v", address)
 		return
 	}
-	fmt.Printf("Connection established\n")
 	bot.connection = conn
 
 	msg := fmt.Sprintf(`{"user": %d}` + "\n", bot.userid)
@@ -49,17 +46,19 @@ func (bot* SimpleBot) SetTargetLocation(loc Vector3) {
 
 }
 
-func (bot* SimpleBot) ReceiveLoop() {
+func (bot* SimpleBot) ReceiveLoop(wg *sync.WaitGroup) {
 	for {
-		recvBuf := make([]byte, 4096)
+		recvBuf := make([]byte, 128*1024)
 		_, err := bot.connection.Read(recvBuf)
 		if err != nil {
-			fmt.Printf("Error in Read: %v\n", err)
 			bot.connection.Close()
 			bot.connection = nil
 			break
 		}
+		//s := string(recvBuf[:n])
+		//fmt.Printf("Received %v bytes: %s\n", n, s)
 	}
+	wg.Done()
 }
 
 func (bot* SimpleBot) BehaviorLoop() {
@@ -70,19 +69,22 @@ func (bot* SimpleBot) BehaviorLoop() {
 }
 
 func main() {
-	for i:= 0; i < 5; i++ {
+	numBots := 500
+	fmt.Printf("Starting %v bots\n", numBots)
+
+	var wg sync.WaitGroup
+	for i:= 0; i < numBots; i++ {
 		bot := NewSimpleBot(int64(i))
 		bot.Connect("localhost:4040")
 		if bot.connection == nil {
 			return
 		}
-		go bot.ReceiveLoop()
+		wg.Add(1)
+		go bot.ReceiveLoop(&wg)
 		go bot.BehaviorLoop()
 
 		time.Sleep(10 * time.Millisecond)
 	}
-
-	exitSignal := make(chan os.Signal)
-	signal.Notify(exitSignal, syscall.SIGINT, syscall.SIGTERM)
-	<-exitSignal
+	fmt.Printf("%v bots running\n", numBots)
+	wg.Wait()
 }
